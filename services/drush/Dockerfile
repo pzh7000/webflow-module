@@ -1,0 +1,1 @@
+FROM forumone/drupal8-cli:8.0

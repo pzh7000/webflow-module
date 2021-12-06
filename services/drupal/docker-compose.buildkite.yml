@@ -1,0 +1,26 @@
+# Docker Compose configuration to support CI operations.
+version: "3.7"
+services:
+  # Target the base build stage of the image for better caching.
+  base:
+    build:
+      target: base
+
+  # Target the final release build stage of the image.
+  release:
+    build:
+      target: release
+
+  # Target the final production build stage of the image.
+  test:
+    build:
+      target: test
+    volumes:
+      - ./.buildkite/artifacts:/var/www/html/artifacts
+
+  # Target the Gesso dependencies stage of the production build.
+  gesso:
+    build:
+      target: gesso
+    volumes:
+      - ./.buildkite/artifacts:/app/artifacts

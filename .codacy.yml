@@ -1,0 +1,43 @@
+---
+engines:
+  phpcs:
+    enabled: true
+    php_version: 7.4
+    base_sub_dir: services/drupal
+  phpmd:
+    enabled: true
+    php_version: 7.4
+    base_sub_dir: services/drupal
+  eslint:
+    enabled: true
+    # Restrict parsing into the Gesso directory where a config file exists.
+    base_sub_dir: services/drupal/web/themes/gesso
+  stylelint:
+    enabled: true
+    # Restrict parsing into the Gesso directory where a config file exists.
+    base_sub_dir: services/drupal/web/themes/gesso
+  remark-lint:
+    enabled: false
+languages:
+  php:
+    # Recognize various Drupal custom file extensions.
+    extensions:
+      - '.php'
+      - '.module'
+      - '.inc'
+      - '.install'
+      - '.profile'
+      - '.theme'
+      - '.test'
+  ruby:
+    # Capfile needs to be specified explicitly due to its unique name.
+    extensions:
+      - '.rb'
+      - '.rake'
+      - 'Capfile'
+exclude_paths:
+  - '.buildkite/artifacts/**'
+  - 'services/drupal/vendor/**'
+  - 'services/drupal/web/core/**'
+  - 'services/drupal/web/libraries/**'
+  - 'services/drupal/web/**/contrib/**'

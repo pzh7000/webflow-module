@@ -1,0 +1,90 @@
+# This is the Docker Compose entry point for this project.
+# Services listed in this file will automatically be built and started when you bring
+# the project up.
+version: "3.7"
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - 8080:80
+      - 8443:443
+    depends_on:
+      - drupal
+    volumes:
+      - ${F1_TLS_CERT}:/etc/nginx/ssl/local.crt:ro,cached
+      - ${F1_TLS_KEY}:/etc/nginx/ssl/local.key:ro,cached
+      - ./services/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro,cached
+      - ./services/drupal/web:/var/www/html/web:cached
+      - type: volume
+        source: fs-data
+        target: /var/www/html/web/sites/default/files
+        read_only: true
+      - &a1
+        type: volume
+        source: gesso-pattern-lab
+        target: /var/www/html/web/themes/gesso/pattern-lab
+      - &a2
+        type: volume
+        source: gesso-css
+        target: /var/www/html/web/themes/gesso/css
+  drupal:
+    build:
+      context: ./services/drupal
+      target: dev
+    command:
+      - sh
+      - -c
+      - >-
+        chmod -R 0777 /var/www/html/web/sites/default/files
+
+        if test ! -z "${F1_XDEBUG:-}"; then
+          docker-php-ext-enable xdebug
+          echo 'xdebug.remote_enable=1' > /usr/local/etc/php/conf.d/xdebug.ini
+        fi
+
+        if test ! -z "${F1_XDEBUG_PROFILE:-}"; then
+          docker-php-ext-enable xdebug
+          if test ! -d "/var/www/html/_profiles"; then
+            mkdir /var/www/html/_profiles
+          fi
+          chmod -R 0777 /var/www/html/_profiles
+          echo 'xdebug.profiler_enable_trigger=1' > /usr/local/etc/php/conf.d/xdebug.ini
+          echo "xdebug.profiler_output_dir='/var/www/html/_profiles'" >> /usr/local/etc/php/conf.d/xdebug.ini
+          echo 'max_execution_time=100' >> /usr/local/etc/php/conf.d/xdebug.ini
+        fi
+
+        exec php-fpm
+    depends_on:
+      - mysql
+    environment:
+      SMTPHOST: mailhog:1025
+      XDEBUG_CONFIG: remote_host=${F1_XDEBUG_REMOTE:-127.0.0.1}
+    volumes:
+      - ./services/drupal:/var/www/html:cached
+      - type: volume
+        source: fs-data
+        target: /var/www/html/web/sites/default/files
+      - *a1
+      - *a2
+  mysql:
+    image: mysql:5.7
+    environment:
+      MYSQL_DATABASE: web
+      MYSQL_USER: web
+      MYSQL_PASSWORD: web
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    ports:
+      - 13306:3306
+    volumes:
+      - type: volume
+        source: mysql-data
+        target: /var/lib/mysql
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - 8025:8025
+volumes:
+  ? fs-data
+  ? mysql-data
+  ? gesso-pattern-lab
+  ? gesso-css

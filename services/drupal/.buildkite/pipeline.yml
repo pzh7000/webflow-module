@@ -1,0 +1,127 @@
+# Consolidate the common configuration for reuse across multiple steps.
+definitions:
+  plugins:
+    ecr: &ecr
+      ecr#v2.0.0:
+        login: true
+        no-include-email: true
+
+env:
+  # Identify the address for the shared Buildkite ECR repository.
+  IMAGE_REPOSITORY: "165761832703.dkr.ecr.us-east-1.amazonaws.com/buildkite"
+
+  # Set this as an environment variable for automatic usage by default for all
+  # docker-compose buildkite plugin executions.
+  BUILDKITE_PLUGIN_DOCKER_COMPOSE_IMAGE_REPOSITORY: "$IMAGE_REPOSITORY"
+
+  # Define a common namespace for images to be published within the shared ECR repo.
+  ECR_NAMESPACE: "${IMAGE_REPOSITORY}:${BUILDKITE_PIPELINE_SLUG}"
+
+steps:
+    # Prebuild the Docker images for later steps.
+  - label: ":docker: Base Image"
+    key: "base_image"
+    timeout_in_minutes: 15
+    agents:
+      queue: "docker-builders"
+    plugins:
+      # Log into ECR for this build step to access and push images.
+      - *ecr
+
+      # Prebuild and upload the listed services defined in the buildkite
+      # Docker Compose configuration. In this case, the various stages
+      # of the multi-stage build for the `drupal` service are uploaded in
+      # addition to the final image.
+      - docker-compose#v3.8.0:
+          build:
+            - base
+          config:
+            - docker-compose.buildkite.yml
+          cache-from:
+            - "base:${ECR_NAMESPACE}--base--${BUILDKITE_BRANCH}"
+            - "base:${ECR_NAMESPACE}--base--latest"
+          push:
+            - "base:${ECR_NAMESPACE}--base--${BUILDKITE_BRANCH}"
+            - "base:${ECR_NAMESPACE}--base--latest"
+          upload-container-logs: "on-error"
+          build-parallel: true
+
+  # Prebuild the Docker images for later steps.
+  - label: ":docker: Release Builds"
+    key: "release_images"
+    depends_on:
+      - "base_image"
+    timeout_in_minutes: 25
+    retry:
+      automatic: 
+        - exit_status: -1
+          limit: 2
+      
+    agents:
+      queue: "docker-builders"
+    plugins:
+      # Log into ECR for this build step to access and push images.
+      - *ecr
+
+      # Prebuild and upload the listed services defined in the buildkite
+      # Docker Compose configuration. In this case, the various stages
+      # of the multi-stage build for the `drupal` service are uploaded in
+      # addition to the final image.
+      - docker-compose#v3.8.0:
+          build:
+            - test
+            - release
+          config:
+            - docker-compose.buildkite.yml
+          cache-from:
+            - "release:${ECR_NAMESPACE}--base--latest"
+            - "release:${ECR_NAMESPACE}--release--${BUILDKITE_COMMIT}"
+            - "release:${ECR_NAMESPACE}--release--${BUILDKITE_BRANCH}"
+            - "release:${ECR_NAMESPACE}--release--latest"
+            - "test:${ECR_NAMESPACE}--base--latest"
+            - "test:${ECR_NAMESPACE}--test--${BUILDKITE_COMMIT}"
+            - "test:${ECR_NAMESPACE}--test--${BUILDKITE_BRANCH}"
+            - "test:${ECR_NAMESPACE}--test--latest"
+          push:
+            - "release:${ECR_NAMESPACE}--release--${BUILDKITE_COMMIT}"
+            - "release:${ECR_NAMESPACE}--release--${BUILDKITE_BRANCH}"
+            - "release:${ECR_NAMESPACE}--release--latest"
+            - "test:${ECR_NAMESPACE}--test--${BUILDKITE_COMMIT}"
+            - "test:${ECR_NAMESPACE}--test--${BUILDKITE_BRANCH}"
+            - "test:${ECR_NAMESPACE}--test--latest"
+          upload-container-logs: "on-error"
+          build-parallel: true
+
+  # Wait for images to finish building.
+  - wait: ~
+
+  # Deploy the built application.
+  - label: ":capistrano: Deploy"
+    key: "deploy"
+    depends_on: "release_images"
+    timeout_in_minutes: 15
+    concurrency: 1
+    concurrency_group: '$BUILDKITE_PIPELINE_SLUG/$BUILDKITE_BRANCH/deploy'
+    branches:
+      - integration
+      - main
+      - live
+    plugins:
+      # Log into ECR for this build step to access prebuilt images.
+      - *ecr
+
+      # Download the prebuilt image and extract project files to the
+      # local filesystem for further operations.
+      - forumone/extract:
+          image-service: release
+          from: /var/www/html
+          to: .
+
+      # Execute a Capistrano deployment using the defined branch to
+      # environment mapping.
+      - forumone/capistrano:
+          require-stage: true
+          branches:
+            integration: dev
+            main: stage
+            live: prod

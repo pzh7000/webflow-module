@@ -1,0 +1,68 @@
+# This is the Compose file for command-line services.
+# Anything that doesn't need to be run as part of the main `docker-compose up'
+# command should reside in here and be invoked by a helper script.
+version: "3.7"
+services:
+  drush:
+    build: ./services/drush
+    entrypoint:
+      - /var/www/html/vendor/bin/drush
+    working_dir: /var/www/html/web
+    volumes:
+      - ./services/drupal:/var/www/html:cached
+      - type: volume
+        source: fs-data
+        target: /var/www/html/web/sites/default/files
+  composer:
+    image: forumone/composer:2
+    volumes:
+      - ./services/drupal:/app:cached
+  codacy:
+    image: codacy/codacy-analysis-cli:latest
+    environment:
+      &a1
+      CODACY_CODE: $PWD
+    command: analyze
+    volumes:
+      &a2
+      - $PWD:$PWD:cached
+      - /var/run/docker.sock:/var/run/docker.sock:cached
+      - /tmp:/tmp:cached
+  phpcs:
+    image: codacy/codacy-analysis-cli:latest
+    environment: *a1
+    command: ""
+    volumes: *a2
+    entrypoint: /opt/codacy/bin/codacy-analysis-cli analyze -t phpcs
+  phpmd:
+    image: codacy/codacy-analysis-cli:latest
+    environment: *a1
+    command: ""
+    volumes: *a2
+    entrypoint: /opt/codacy/bin/codacy-analysis-cli analyze -t phpmd
+  eslint:
+    image: codacy/codacy-analysis-cli:latest
+    environment: *a1
+    command: ""
+    volumes: *a2
+    entrypoint: /opt/codacy/bin/codacy-analysis-cli analyze -t eslint
+  stylelint:
+    image: codacy/codacy-analysis-cli:latest
+    environment: *a1
+    command: ""
+    volumes: *a2
+    entrypoint: /opt/codacy/bin/codacy-analysis-cli analyze -t stylelint
+  gesso:
+    build: ./services/drupal/web/themes/gesso
+    init: true
+    volumes:
+      - ./services/drupal/web/themes/gesso/images:/app/images:cached
+      - ./services/drupal/web/themes/gesso/js:/app/js:cached
+      - ./services/drupal/web/themes/gesso/source:/app/source:cached
+      - type: volume
+        source: gesso-pattern-lab
+        target: /app/pattern-lab
+      - type: volume
+        source: gesso-css
+        target: /app/css
+volumes: {}

@@ -1,0 +1,21 @@
+{
+    "name": "forumone/gesso_helper",
+    "description": "Provides additional functionality for the Gesso theme.",
+    "type": "drupal-drush",
+    "authors": [
+        {
+            "name": "Forum One",
+            "email": "author@example.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.3"
+    },
+    "extra": {
+        "drush": {
+            "services": {
+                "drush.services.yml": "^9.4.0 | ^10.0.0"
+            }
+        }
+    }
+}
