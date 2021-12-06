@@ -1,0 +1,6 @@
+webflow.settings_form:
+  title: webflow
+  description: Configure webflow.
+  parent: system.admin_config_system
+  route_name: webflow.settings_form
+  weight: 10
