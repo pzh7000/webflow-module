@@ -31,6 +31,7 @@ packages:
     doctrine/instantiator: 1.4.0
     doctrine/lexer: 1.2.1
     doctrine/reflection: 1.2.2
+    drupal/admin_toolbar: 3.0.3
     drupal/coder: 8.3.13
     drupal/components: 2.4.0
     drupal/console: 1.9.8
